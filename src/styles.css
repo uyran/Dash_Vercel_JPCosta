@@ -1,0 +1,180 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+/*
+ * Design system definition — Painel eleitoral de João Paulo Costa (13444).
+ *
+ * Paleta verde-água (teal) e tipografia Sora/Inter, para diferenciar este
+ * dashboard do painel do João Paulo do PT (primária vermelha, fonte padrão).
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root block defines the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-hovercard: var(--hovercard);
+  --color-nav: var(--nav);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-4: var(--chart-4);
+  --color-zebra: var(--zebra);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-display:
+    "Sora", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.977 0.01 195);
+  --foreground: oklch(0.212 0.03 210);
+  --card: oklch(1 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.212 0.03 210);
+  --hovercard: oklch(0.955 0.024 180);
+  --nav: oklch(0.45 0.085 198);
+  --nav-foreground: oklch(0.99 0 0);
+  --primary: oklch(0.55 0.13 172);
+  --primary-foreground: oklch(0.99 0 0);
+  --success: oklch(0.6 0.155 148);
+  --danger: oklch(0.58 0.21 25);
+  --muted: oklch(0.965 0.007 205);
+  --muted-foreground: oklch(0.52 0.045 210);
+  --accent: oklch(0.965 0.007 205);
+  --accent-foreground: oklch(0.235 0.035 210);
+  --border: oklch(0.915 0.014 195);
+  --input: oklch(0.915 0.014 195);
+  --ring: oklch(0.66 0.115 172);
+  --chart-4: oklch(0.85 0.12 200);
+  --zebra: oklch(0.968 0.012 185);
+}
+
+@layer components {
+  tbody > tr:nth-child(odd) {
+    background-color: var(--card);
+  }
+
+  tbody > tr:nth-child(even) {
+    background-color: var(--zebra);
+  }
+
+  .btn-3d {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 2px solid var(--nav);
+    border-radius: 9999px;
+    background-color: color-mix(in oklch, var(--nav) 10%, var(--card));
+    box-shadow:
+      0 4px 0 0 var(--nav),
+      0 5px 0 1px rgb(0 0 0 / 0.18);
+    padding: 0.25rem 0.7rem;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--foreground);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition:
+      transform 140ms ease,
+      box-shadow 140ms ease,
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease;
+  }
+
+  .btn-3d:hover {
+    transform: translateY(-2px);
+    background-color: color-mix(in oklch, var(--primary) 45%, var(--card));
+    border-color: var(--primary);
+    box-shadow:
+      0 6px 0 0 var(--primary),
+      0 7px 0 1px rgb(0 0 0 / 0.2);
+    color: var(--foreground);
+  }
+
+  .btn-3d:active {
+    transform: translateY(3px);
+    background-color: color-mix(in oklch, var(--primary) 30%, var(--card));
+    box-shadow:
+      0 1px 0 0 var(--nav),
+      0 2px 0 1px rgb(0 0 0 / 0.18);
+  }
+
+  .btn-3d[data-active="true"] {
+    background-color: var(--primary);
+    border-color: color-mix(in oklch, var(--primary) 70%, black);
+    color: var(--primary-foreground);
+    box-shadow:
+      0 4px 0 0 color-mix(in oklch, var(--primary) 62%, black),
+      0 5px 0 1px rgb(0 0 0 / 0.2);
+  }
+
+  .btn-3d[data-active="true"]:hover {
+    background-color: color-mix(in oklch, var(--primary) 80%, black);
+    border-color: color-mix(in oklch, var(--primary) 55%, black);
+    box-shadow:
+      0 6px 0 0 color-mix(in oklch, var(--primary) 55%, black),
+      0 7px 0 1px rgb(0 0 0 / 0.22);
+    color: var(--primary-foreground);
+  }
+
+  .btn-3d[data-active="true"]:active {
+    transform: translateY(3px);
+    background-color: color-mix(in oklch, var(--primary) 70%, black);
+    box-shadow:
+      0 1px 0 0 color-mix(in oklch, var(--primary) 62%, black),
+      0 2px 0 1px rgb(0 0 0 / 0.2);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+}
