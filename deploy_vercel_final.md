@@ -254,3 +254,26 @@ Token de API fica em `%APPDATA%\com.vercel.cli\Data\auth.json` no Windows — **
 | `npm run lint` falha antes do commit        | formatação/erros                                     | `npx prettier --write .` e corrija o ESLint; nunca use `--no-verify`                       |
 | Erro de permissão em repo privado           | App sem acesso                                       | GitHub → Settings → Installations → Vercel → conceder acesso                               |
 | Variável de ambiente "não existe" no app    | prefixo errado ou não cadastrada                     | §7: confirme o prefixo e o ambiente no painel                                              |
+| Site mostrou o conteúdo **de outro** dashboard | deploy feito no projeto errado (vínculo trocado)   | §11: confira `.vercel/project.json` antes; restaure o projeto do dono e reconecte o repo certo |
+
+---
+
+## 11. Prevenção — nunca sobrescreva o projeto de outro app
+
+**Erro real que motivou esta seção:** uma pasta de dashboard foi copiada levando junto a pasta `.vercel/`, que guarda o vínculo com o projeto de **outro** dashboard. Um `vercel git connect` + `vercel deploy --prod` seguintes foram para o projeto errado e **sobrescreveram o site de produção** já divulgado; em seguida renomear e "recriar" o projeto apagou deployments, domínio e configurações **sem possibilidade de desfazer**.
+
+**Antes de qualquer `vercel link`, `vercel git connect` ou `vercel deploy --prod`:**
+
+```bash
+type .vercel\project.json   # "projectName"/"projectId" precisam ser do projeto DESTA pasta
+npx vercel whoami           # conta/identidade certas
+npx vercel project ls       # projetos existentes no escopo
+```
+
+Regras:
+
+1. **Nunca copie a pasta `.vercel/`** ao duplicar/clonar um dashboard. Apague-a da cópia e refaça o vínculo com `vercel link` para o projeto **novo**.
+2. Um projeto Vercel aceita **um** repositório por vez: `git connect` em projeto já conectado **troca** a origem — os pushes do dashboard B passam a compilar o projeto do A e **substituem o site** dele.
+3. **Não renomeie nem "recrie" projetos** para separar apps: `vercel project delete` destrói o projeto antigo junto com deployments e vínculos. Para separar: `vercel project create <novo>` + `vercel link` na pasta certa.
+4. Repositório com os arquivos **na raiz** (sem subpasta como `Ivete/`): assim o build acha o `package.json` e não depende de `Root Directory`. Se o repo já estiver com subpasta, configure `Root Directory` no painel antes do push.
+5. Depois de conectar/deployar, confirme: `vercel project ls` · `git remote -v` · abra a URL e veja se **o conteúdo é o do dashboard certo**.
