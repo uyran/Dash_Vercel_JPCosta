@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -68,11 +68,54 @@ const ABREVIA: Record<string, string> = {
 };
 const nomeCidade = (c: string) => ABREVIA[c] ?? c;
 
-/* Estimativa conservadora da largura do rótulo da cidade no eixo (10px). */
-function larguraTexto(texto: string) {
+/* Larguras aproximadas do Inter (em fração de em), para estimar o espaço que
+   os rótulos ocupam no eixo sem cortar nenhum nome. */
+const LARGURA_EM: Record<string, number> = {
+  A: 0.667,
+  B: 0.672,
+  C: 0.672,
+  D: 0.706,
+  E: 0.611,
+  F: 0.583,
+  G: 0.717,
+  H: 0.739,
+  I: 0.296,
+  J: 0.478,
+  K: 0.651,
+  L: 0.556,
+  M: 0.853,
+  N: 0.739,
+  O: 0.756,
+  P: 0.651,
+  Q: 0.769,
+  R: 0.672,
+  S: 0.617,
+  T: 0.617,
+  U: 0.717,
+  V: 0.651,
+  W: 1.039,
+  X: 0.634,
+  Y: 0.617,
+  Z: 0.606,
+  " ": 0.273,
+  "-": 0.396,
+  ".": 0.273,
+};
+
+/* Estimativa da largura do rótulo da cidade no eixo. */
+function larguraTexto(texto: string, fontSize = 10) {
+  const semAcentos = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   let w = 0;
-  for (const ch of texto) w += ch === " " ? 3 : 7;
+  for (const ch of semAcentos) w += (LARGURA_EM[ch] ?? 0.68) * fontSize;
   return w;
+}
+
+/* Corta o nome com "…" quando ele não cabe na faixa disponível do eixo. */
+function cortarNome(nome: string, maxPx: number, fontSize: number) {
+  if (larguraTexto(nome, fontSize) <= maxPx) return nome;
+  let s = nome;
+  while (s.length > 1 && larguraTexto(`${s}…`, fontSize) > maxPx) s = s.slice(0, -1).trimEnd();
+  return `${s}…`;
 }
 
 function useData() {
@@ -328,6 +371,7 @@ function TickCidade({
   fill = "#666",
   fontSize,
   className,
+  maxPx,
 }: {
   payload?: { value?: unknown };
   x?: number;
@@ -336,9 +380,12 @@ function TickCidade({
   fill?: string;
   fontSize?: number;
   className?: string;
+  maxPx?: number;
 }) {
   const label = typeof payload?.value === "string" ? payload.value : "";
   if (!label) return null;
+  const nome = nomeCidade(label);
+  const texto = maxPx ? cortarNome(nome, maxPx, fontSize ?? 10) : nome;
   return (
     <text
       x={x}
@@ -349,10 +396,15 @@ function TickCidade({
       fontSize={fontSize}
       className={className}
     >
-      {nomeCidade(label)}
+      {texto}
     </text>
   );
 }
+
+/* Traço curto do eixo de cidades e folga de segurança da estimativa de largura
+   (a folga cobre diferenças de renderização da fonte). */
+const TICK_EIXO = 4;
+const FOLGA_EIXO = 6;
 
 function Chart({
   title,
@@ -370,15 +422,33 @@ function Chart({
   const lastPage = Math.max(0, Math.ceil(data.length / porPagina) - 1);
   const visible = data.slice(page * porPagina, (page + 1) * porPagina);
 
-  /* Largura mínima do eixo de cidades: apenas o necessário para o nome mais
-     comprido da lista, aproximando o gráfico da margem esquerda sem cortar
-     nenhum rótulo. */
+  /* Largura real do gráfico: em telas estreitas (celular) o eixo de cidades é
+     reduzido, a fonte diminui e os nomes muito compridos são cortados com "…",
+     liberando espaço para a faixa das barras. No desktop nada muda. */
+  const caixaRef = useRef<HTMLDivElement>(null);
+  const [larguraCaixa, setLarguraCaixa] = useState(0);
+  useEffect(() => {
+    const el = caixaRef.current;
+    if (!el) return;
+    const medir = () => setLarguraCaixa(el.getBoundingClientRect().width);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const estreito = larguraCaixa > 0 && larguraCaixa < 560;
+  const fsTick = estreito ? 8 : 10;
+  const margemDir = estreito ? Math.min(margemDireita, 44) : margemDireita;
+  const tetoEixo = estreito ? Math.max(56, Math.round(larguraCaixa * 0.45)) : 180;
+
+  /* Largura do eixo: só o necessário para o nome mais comprido da lista,
+     aproximando o gráfico da margem esquerda sem cortar nenhum rótulo. */
+  const nomes = estreito ? visible : data;
+  const necessaria = Math.max(0, ...nomes.map((c) => larguraTexto(nomeCidade(c.cidade), fsTick)));
   const larguraEixo = Math.min(
-    180,
-    Math.max(
-      70,
-      Math.ceil(Math.max(0, ...data.map((c) => larguraTexto(nomeCidade(c.cidade))))) + 16,
-    ),
+    tetoEixo,
+    Math.max(estreito ? 44 : 50, Math.ceil(necessaria * 1.015) + FOLGA_EIXO + TICK_EIXO),
   );
 
   return (
@@ -417,32 +487,36 @@ function Chart({
           {page * porPagina + 1}–{Math.min((page + 1) * porPagina, data.length)} de {data.length}
         </span>
       </div>
-      <ResponsiveContainer width="100%" height={440}>
-        <BarChart data={visible} layout="vertical" margin={{ left: 0, right: margemDireita }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis
-            type="number"
-            fontSize={11}
-            domain={[(min: number) => (min < 0 ? min * 1.45 : min), (max: number) => max]}
-          />
-          <YAxis
-            type="category"
-            dataKey="cidade"
-            width={larguraEixo}
-            fontSize={10}
-            interval={0}
-            tick={<TickCidade />}
-          />
-          <Tooltip content={<VoteTooltip />} />
-          <Bar
-            dataKey="diff"
-            name="Diferença"
-            fill={color}
-            isAnimationActive={false}
-            shape={BarraShape}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+      <div ref={caixaRef} className="w-full">
+        <ResponsiveContainer width="100%" height={440}>
+          <BarChart data={visible} layout="vertical" margin={{ left: 0, right: margemDir }}>
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+            <XAxis
+              type="number"
+              fontSize={11}
+              domain={[(min: number) => (min < 0 ? min * 1.45 : min), (max: number) => max]}
+            />
+            <YAxis
+              type="category"
+              dataKey="cidade"
+              width={larguraEixo}
+              fontSize={fsTick}
+              interval={0}
+              tickSize={TICK_EIXO}
+              tickMargin={0}
+              tick={<TickCidade maxPx={larguraEixo - TICK_EIXO} />}
+            />
+            <Tooltip content={<VoteTooltip />} />
+            <Bar
+              dataKey="diff"
+              name="Diferença"
+              fill={color}
+              isAnimationActive={false}
+              shape={BarraShape}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
