@@ -354,7 +354,17 @@ function TickCidade({
   );
 }
 
-function Chart({ title, data, color }: { title: string; data: City[]; color: string }) {
+function Chart({
+  title,
+  data,
+  color,
+  margemDireita = 74,
+}: {
+  title: string;
+  data: City[];
+  color: string;
+  margemDireita?: number;
+}) {
   const [page, setPage] = useState(0);
   const porPagina = 15;
   const lastPage = Math.max(0, Math.ceil(data.length / porPagina) - 1);
@@ -408,7 +418,7 @@ function Chart({ title, data, color }: { title: string; data: City[]; color: str
         </span>
       </div>
       <ResponsiveContainer width="100%" height={440}>
-        <BarChart data={visible} layout="vertical" margin={{ left: 0, right: 74 }}>
+        <BarChart data={visible} layout="vertical" margin={{ left: 0, right: margemDireita }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis
             type="number"
@@ -608,6 +618,7 @@ function Dashboard() {
           title="Cidades com maior queda numérica de votos"
           data={down}
           color="var(--danger)"
+          margemDireita={8}
         />
       </section>
 
