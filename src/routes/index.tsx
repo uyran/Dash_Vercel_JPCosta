@@ -45,8 +45,16 @@ type City = { cidade: string; v22: number; v26: number; diff: number; pctText: s
 type CityBase = Omit<City, "pctText">;
 
 /* Colunas ordenáveis da tabela "Votos por cidade". */
-type OrdemCidade = "cidade" | "v22" | "v26";
+type OrdemCidade = "cidade" | "v22" | "v26" | "diff" | "pct";
 type Ordenacao = { chave: OrdemCidade; dir: "asc" | "desc" };
+
+/* Valor numérico usado na ordenação das colunas de números. */
+const valorOrd = (c: City, chave: OrdemCidade): number => {
+  if (chave === "cidade") return 0;
+  if (chave === "pct")
+    return c.v22 === 0 ? (c.v26 > 0 ? Number.POSITIVE_INFINITY : 0) : (c.v26 - c.v22) / c.v22;
+  return c[chave];
+};
 
 const pctText = (c: CityBase) =>
   c.v22 === 0 ? (c.v26 > 0 ? "novo" : "—") : `${c.diff > 0 ? "+" : ""}${pct(c.v22, c.v26)}`;
@@ -59,6 +67,13 @@ const ABREVIA: Record<string, string> = {
   "SANTA MARIA DO CAMBUCÁ": "STA MARIA DO CAMBUCÁ",
 };
 const nomeCidade = (c: string) => ABREVIA[c] ?? c;
+
+/* Estimativa conservadora da largura do rótulo da cidade no eixo (10px). */
+function larguraTexto(texto: string) {
+  let w = 0;
+  for (const ch of texto) w += ch === " " ? 3 : 7;
+  return w;
+}
 
 function useData() {
   return useMemo(() => {
@@ -344,6 +359,18 @@ function Chart({ title, data, color }: { title: string; data: City[]; color: str
   const porPagina = 15;
   const lastPage = Math.max(0, Math.ceil(data.length / porPagina) - 1);
   const visible = data.slice(page * porPagina, (page + 1) * porPagina);
+
+  /* Largura mínima do eixo de cidades: apenas o necessário para o nome mais
+     comprido da lista, aproximando o gráfico da margem esquerda sem cortar
+     nenhum rótulo. */
+  const larguraEixo = Math.min(
+    180,
+    Math.max(
+      70,
+      Math.ceil(Math.max(0, ...data.map((c) => larguraTexto(nomeCidade(c.cidade))))) + 16,
+    ),
+  );
+
   return (
     <div className="min-w-0 rounded-xl border bg-card p-5 shadow-sm">
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -391,7 +418,7 @@ function Chart({ title, data, color }: { title: string; data: City[]; color: str
           <YAxis
             type="category"
             dataKey="cidade"
-            width={175}
+            width={larguraEixo}
             fontSize={10}
             interval={0}
             tick={<TickCidade />}
@@ -446,11 +473,10 @@ function Dashboard() {
   const topTotal = top.reduce((s, c) => s + c.v26, 0);
   const topShare = t26 > 0 ? topTotal / t26 : 0;
 
+  /* 1º clique na coluna: ordem crescente; clique seguinte: inverte a ordem. */
   const ordenarPor = (chave: OrdemCidade) =>
     setSort((s) =>
-      s.chave === chave
-        ? { chave, dir: s.dir === "asc" ? "desc" : "asc" }
-        : { chave, dir: chave === "cidade" ? "asc" : "desc" },
+      s.chave === chave ? { chave, dir: s.dir === "asc" ? "desc" : "asc" } : { chave, dir: "asc" },
     );
 
   const thBotao = (chave: OrdemCidade, rotulo: string) => (
@@ -460,7 +486,7 @@ function Dashboard() {
       aria-label={`Ordenar por ${rotulo}`}
       aria-pressed={sort.chave === chave}
       data-active={sort.chave === chave}
-      className="btn-3d group relative peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
+      className="btn-3d th-btn group relative focus-visible:ring-2 focus-visible:ring-ring"
     >
       {rotulo}
       <span aria-hidden="true" className="text-[9px] opacity-80">
@@ -476,7 +502,8 @@ function Dashboard() {
     return [...base].sort((a, b) =>
       sort.chave === "cidade"
         ? dir * a.cidade.localeCompare(b.cidade, "pt-BR")
-        : dir * (a[sort.chave] - b[sort.chave]),
+        : dir * (valorOrd(a, sort.chave) - valorOrd(b, sort.chave)) ||
+          a.cidade.localeCompare(b.cidade, "pt-BR"),
     );
   }, [cities, filter, sort]);
 
@@ -485,8 +512,8 @@ function Dashboard() {
       <TituloAssembleiaPE />
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card label="Votos 2022" value={fmt(t22)} bg="bg-muted" />
-        <Card label="Votos 2026" value={fmt(t26)} bg="bg-muted" />
+        <Card label="Votos 2022" value={fmt(t22)} bg="bg-primary/15" />
+        <Card label="Votos 2026" value={fmt(t26)} bg="bg-primary/15" />
         <Card
           label="Diferença"
           value={`${diff > 0 ? "+" : ""}${fmt(diff)}`}
@@ -609,16 +636,8 @@ function Dashboard() {
                 <th className="py-2">{thBotao("cidade", "Cidade")}</th>
                 <th className="px-5 py-2 text-center">{thBotao("v22", "2022")}</th>
                 <th className="px-5 py-2 text-center">{thBotao("v26", "2026")}</th>
-                <th className="px-5 py-2 text-center">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    Dif.
-                  </span>
-                </th>
-                <th className="px-5 py-2 text-center">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    %
-                  </span>
-                </th>
+                <th className="px-5 py-2 text-center">{thBotao("diff", "Dif.")}</th>
+                <th className="px-5 py-2 text-center">{thBotao("pct", "%")}</th>
               </tr>
             </thead>
             <tbody>

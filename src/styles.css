@@ -157,6 +157,21 @@
       0 1px 0 0 color-mix(in oklch, var(--primary) 62%, black),
       0 2px 0 1px rgb(0 0 0 / 0.2);
   }
+
+  /* Tamanho único dos botões de cabeçalho de tabela: mesmo comprimento e
+     altura em todas as colunas, independentemente do rótulo. */
+  .th-btn {
+    width: 7rem;
+    height: 2.15rem;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /* Títulos de coluna sem ação: mesma aparência dos botões, mas inertes. */
+  .th-btn[aria-disabled="true"] {
+    cursor: default;
+    pointer-events: none;
+  }
 }
 
 @layer base {

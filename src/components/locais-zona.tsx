@@ -38,22 +38,80 @@ const POR_NOME = new Map(CIDADES.map((c) => [c.nome, c]));
 const INICIAL = CIDADES.reduce((best, c) => (c.total > best.total ? c : best));
 
 type Ordem = "local" | "votos" | "endereco" | "bairro";
+type Ordenacao = { chave: Ordem; dir: "asc" | "desc" };
+
+/* Grid fixo dos botões de zona, igual ao da cidade de Recife (maior número de
+   zonas): assim todos os botões têm o mesmo tamanho em qualquer cidade.
+   No celular, no máximo duas colunas. */
+const ZONA_GRID = "grid-cols-2 sm:grid-cols-4 md:grid-cols-6";
+
+function ThBotao({
+  chave,
+  rotulo,
+  ordem,
+  onClick,
+}: {
+  chave: Ordem;
+  rotulo: string;
+  ordem: Ordenacao;
+  onClick: (chave: Ordem) => void;
+}) {
+  const ativo = ordem.chave === chave;
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(chave)}
+      aria-label={`Ordenar por ${rotulo}`}
+      aria-pressed={ativo}
+      data-active={ativo}
+      className="btn-3d th-btn group relative focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {rotulo}
+      <span aria-hidden="true" className="text-[9px] opacity-80">
+        {ativo ? (ordem.dir === "asc" ? "▲" : "▼") : "↕"}
+      </span>
+      <AjudaOrdem />
+    </button>
+  );
+}
+
+/* Título de coluna sem ordenação: mesma aparência dos botões, sem ação. */
+function ThEstatico({ rotulo }: { rotulo: string }) {
+  return (
+    <span aria-disabled="true" className="btn-3d th-btn select-none">
+      {rotulo}
+    </span>
+  );
+}
 
 export function LocaisZona() {
   const [cidade, setCidade] = useState(INICIAL.nome);
   const [zonaSel, setZonaSel] = useState(INICIAL.zonaLider);
-  const [ordem, setOrdem] = useState<Ordem>("votos");
+  const [ordem, setOrdem] = useState<Ordenacao>({ chave: "votos", dir: "desc" });
   const info = POR_NOME.get(cidade) ?? INICIAL;
   const zona = info.zonas.find((z) => z.zona === zonaSel) ?? null;
+
   const linhas = useMemo(() => {
     if (!zona) return [];
     const ls = [...zona.locais];
-    if (ordem === "local") ls.sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
-    else if (ordem === "endereco") ls.sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-    else if (ordem === "bairro") ls.sort((a, b) => (a[7] || "").localeCompare(b[7] || "", "pt-BR"));
-    else ls.sort((a, b) => b[2] - a[2] || a[0].localeCompare(b[0], "pt-BR"));
+    const dir = ordem.dir === "asc" ? 1 : -1;
+    if (ordem.chave === "local")
+      ls.sort((a, b) => dir * a[0].localeCompare(b[0], "pt-BR") || dir * (a[2] - b[2]));
+    else if (ordem.chave === "endereco")
+      ls.sort((a, b) => dir * a[1].localeCompare(b[1], "pt-BR") || dir * (a[2] - b[2]));
+    else if (ordem.chave === "bairro")
+      ls.sort(
+        (a, b) => dir * (a[7] || "").localeCompare(b[7] || "", "pt-BR") || dir * (a[2] - b[2]),
+      );
+    else ls.sort((a, b) => dir * (a[2] - b[2]) || a[0].localeCompare(b[0], "pt-BR"));
     return ls;
   }, [zona, ordem]);
+
+  /* 1º clique na coluna: ordem crescente; clique seguinte: inverte a ordem. */
+  const ordenarPor = (chave: Ordem) =>
+    setOrdem((s) =>
+      s.chave === chave ? { chave, dir: s.dir === "asc" ? "desc" : "asc" } : { chave, dir: "asc" },
+    );
 
   const trocar = (nome: string) => {
     const c = POR_NOME.get(nome);
@@ -75,7 +133,7 @@ export function LocaisZona() {
           value={cidade}
           onChange={(e) => trocar(e.target.value)}
           aria-label="Escolher cidade"
-          className="rounded-md border bg-background px-3 py-2 text-sm"
+          className="rounded-lg border-[3px] border-nav bg-nav/10 px-4 py-2 text-sm font-semibold text-foreground shadow-md outline-none focus-visible:ring-2 focus-visible:ring-nav/50 focus-visible:ring-offset-1"
         >
           {CIDADES.map((c) => (
             <option key={c.nome}>{c.nome}</option>
@@ -97,11 +155,11 @@ export function LocaisZona() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className={`mb-4 grid gap-2 ${ZONA_GRID}`}>
         {info.zonas.map((z) => {
           const marcada = z.zona === zonaSel;
           return (
-            <label key={z.zona} className="inline-flex">
+            <label key={z.zona} className="flex">
               <input
                 type="radio"
                 name="zona-locais"
@@ -111,7 +169,7 @@ export function LocaisZona() {
               />
               <span
                 data-active={marcada}
-                className="btn-3d px-3 py-1.5 text-xs peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
+                className="btn-3d w-full justify-center px-2 py-1.5 text-xs peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
               >
                 Zona {z.zona} - {fmt(z.total)}
               </span>
@@ -128,101 +186,31 @@ export function LocaisZona() {
             <thead className="sticky top-0 bg-card">
               <tr className="border-b text-left text-muted-foreground">
                 <th className="py-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name="ordem-locais"
-                      className="peer sr-only"
-                      checked={ordem === "local"}
-                      onChange={() => setOrdem("local")}
-                    />
-                    <span
-                      data-active={ordem === "local"}
-                      className="btn-3d group relative peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
-                    >
-                      Local de votação
-                      <AjudaOrdem />
-                    </span>
-                  </label>
+                  <ThBotao chave="local" rotulo="Local" ordem={ordem} onClick={ordenarPor} />
                 </th>
-                <th className="py-2 px-4 text-center">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name="ordem-locais"
-                      className="peer sr-only"
-                      checked={ordem === "votos"}
-                      onChange={() => setOrdem("votos")}
-                    />
-                    <span
-                      data-active={ordem === "votos"}
-                      className="btn-3d group relative peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
-                    >
-                      Votos
-                      <AjudaOrdem />
-                    </span>
-                  </label>
+                <th className="px-4 py-2 text-center">
+                  <ThBotao chave="votos" rotulo="Votos" ordem={ordem} onClick={ordenarPor} />
+                </th>
+                <th className="py-2 text-center">
+                  <ThBotao chave="endereco" rotulo="End." ordem={ordem} onClick={ordenarPor} />
                 </th>
                 <th className="py-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name="ordem-locais"
-                      className="peer sr-only"
-                      checked={ordem === "endereco"}
-                      onChange={() => setOrdem("endereco")}
-                    />
-                    <span
-                      data-active={ordem === "endereco"}
-                      className="btn-3d group relative peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
-                    >
-                      Endereço
-                      <AjudaOrdem />
-                    </span>
-                  </label>
+                  <ThBotao chave="bairro" rotulo="Bairro" ordem={ordem} onClick={ordenarPor} />
                 </th>
-                <th className="py-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name="ordem-locais"
-                      className="peer sr-only"
-                      checked={ordem === "bairro"}
-                      onChange={() => setOrdem("bairro")}
-                    />
-                    <span
-                      data-active={ordem === "bairro"}
-                      className="btn-3d group relative peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
-                    >
-                      Bairro
-                      <AjudaOrdem />
-                    </span>
-                  </label>
+                <th className="py-2 text-center">
+                  <ThEstatico rotulo="Seções" />
                 </th>
-                <th className="w-[140px] py-2 text-center">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    Seções
-                  </span>
+                <th className="py-2 text-center whitespace-nowrap">
+                  <ThEstatico rotulo="Aptos" />
                 </th>
-                <th className="py-2 pl-5 pr-2 text-center whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    Aptos
-                  </span>
+                <th className="py-2 text-center whitespace-nowrap">
+                  <ThEstatico rotulo="Comparec." />
                 </th>
-                <th className="py-2 pl-5 pr-2 text-center whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    Comparec.
-                  </span>
+                <th className="py-2 text-center whitespace-nowrap">
+                  <ThEstatico rotulo="Abst." />
                 </th>
-                <th className="py-2 pl-5 pr-2 text-center whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    Abst.
-                  </span>
-                </th>
-                <th className="py-2 pl-5 pr-2 text-center whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full border-2 border-border px-[0.7rem] py-1 text-[11px] font-semibold leading-[1.25] text-muted-foreground">
-                    Nominais
-                  </span>
+                <th className="py-2 text-center whitespace-nowrap">
+                  <ThEstatico rotulo="Nominais" />
                 </th>
               </tr>
             </thead>

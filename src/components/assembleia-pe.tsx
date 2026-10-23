@@ -534,7 +534,15 @@ export function AssembleiaPE() {
       </div>
 
       <p className="mt-2! flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span>Desenvolvido por uyrancosta@gmail.com</span>
+        <span>
+          Desenvolvido por{" "}
+          <a
+            href="mailto:uyrancosta@gmail.com"
+            className="font-medium text-nav underline underline-offset-2 hover:text-primary"
+          >
+            uyrancosta@gmail.com
+          </a>
+        </span>
         <span>Dados oficiais do TSE / Mapas: Electomaps</span>
       </p>
     </section>
