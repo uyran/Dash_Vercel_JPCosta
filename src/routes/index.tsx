@@ -41,8 +41,7 @@ const pct = (a: number, b: number) =>
       : "—"
     : `${(((b - a) / a) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
-type City = { cidade: string; v22: number; v26: number; diff: number; pctText: string };
-type CityBase = Omit<City, "pctText">;
+type City = { cidade: string; v22: number; v26: number; diff: number };
 
 /* Colunas ordenáveis da tabela "Votos por cidade". */
 type OrdemCidade = "cidade" | "v22" | "v26" | "diff" | "pct";
@@ -55,9 +54,6 @@ const valorOrd = (c: City, chave: OrdemCidade): number => {
     return c.v22 === 0 ? (c.v26 > 0 ? Number.POSITIVE_INFINITY : 0) : (c.v26 - c.v22) / c.v22;
   return c[chave];
 };
-
-const pctText = (c: CityBase) =>
-  c.v22 === 0 ? (c.v26 > 0 ? "novo" : "—") : `${c.diff > 0 ? "+" : ""}${pct(c.v22, c.v26)}`;
 
 const ABREVIA: Record<string, string> = {
   "JABOATÃO DOS GUARARAPES": "JABOATÃO",
@@ -120,7 +116,7 @@ function cortarNome(nome: string, maxPx: number, fontSize: number) {
 
 function useData() {
   return useMemo(() => {
-    const m = new Map<string, CityBase>();
+    const m = new Map<string, City>();
     for (const [c, , ano, v] of rows) {
       const o = m.get(c) ?? { cidade: c, v22: 0, v26: 0, diff: 0 };
       if (ano === 2022) o.v22 += v;
@@ -128,9 +124,7 @@ function useData() {
       o.diff = o.v26 - o.v22;
       m.set(c, o);
     }
-    const cities = [...m.values()]
-      .map((c) => ({ ...c, pctText: pctText(c) }))
-      .sort((a, b) => a.cidade.localeCompare(b.cidade));
+    const cities = [...m.values()].sort((a, b) => a.cidade.localeCompare(b.cidade));
     const t22 = cities.reduce((s, c) => s + c.v22, 0);
     const t26 = cities.reduce((s, c) => s + c.v26, 0);
     return { cities, t22, t26 };
@@ -331,7 +325,7 @@ function BarraShape(arg: unknown) {
     height = 0,
     fill = "currentColor",
     fillOpacity = 1,
-    pctText: pct = "",
+    value = 0,
     background,
   } = (arg ?? {}) as {
     x?: number;
@@ -340,13 +334,14 @@ function BarraShape(arg: unknown) {
     height?: number;
     fill?: string;
     fillOpacity?: number;
-    pctText?: string;
+    value?: number;
     background?: { x?: number; y?: number; width?: number; height?: number };
   };
   const bx = background?.x ?? Math.min(x, x + width);
   const by = background?.y ?? y;
   const bw = background?.width ?? Math.abs(width);
   const bh = background?.height ?? height;
+  const rotulo = `${value >= 0 ? "+" : ""}${fmt(value)}`;
   return (
     <g>
       <rect x={bx} y={by} width={bw} height={bh} fill="transparent" pointerEvents="all" />
@@ -358,7 +353,7 @@ function BarraShape(arg: unknown) {
         fill={fill}
         fillOpacity={fillOpacity}
       />
-      <BarPctLabel x={x} y={y} width={width} height={height} value={pct} color={fill} />
+      <BarPctLabel x={x} y={y} width={width} height={height} value={rotulo} color={fill} />
     </g>
   );
 }
@@ -406,21 +401,12 @@ function TickCidade({
 const TICK_EIXO = 4;
 const FOLGA_EIXO = 6;
 
-function Chart({
-  title,
-  data,
-  color,
-  margemDireita = 74,
-}: {
-  title: string;
-  data: City[];
-  color: string;
-  margemDireita?: number;
-}) {
+function Chart({ title, data, color }: { title: string; data: City[]; color: string }) {
   const [page, setPage] = useState(0);
   const porPagina = 15;
   const lastPage = Math.max(0, Math.ceil(data.length / porPagina) - 1);
   const visible = data.slice(page * porPagina, (page + 1) * porPagina);
+  const somenteQueda = data.length > 0 && data.every((c) => c.diff < 0);
 
   /* Largura real do gráfico: em telas estreitas (celular) o eixo de cidades é
      reduzido, a fonte diminui e os nomes muito compridos são cortados com "…",
@@ -439,7 +425,7 @@ function Chart({
 
   const estreito = larguraCaixa > 0 && larguraCaixa < 560;
   const fsTick = estreito ? 8 : 10;
-  const margemDir = estreito ? Math.min(margemDireita, 44) : margemDireita;
+  const margemDir = estreito ? 44 : 74;
   const tetoEixo = estreito ? Math.max(56, Math.round(larguraCaixa * 0.45)) : 180;
 
   /* Largura do eixo: só o necessário para o nome mais comprido da lista,
@@ -457,35 +443,35 @@ function Chart({
         <div className="min-w-0">
           <h3 className="font-semibold">{title}</h3>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="default"
-            size="icon"
-            className="bg-nav text-nav-foreground hover:bg-nav/90"
-            aria-label={`Retroceder — ${title}`}
-            title="15 cidades anteriores"
-            disabled={page === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="default"
-            size="icon"
-            className="bg-nav text-nav-foreground hover:bg-nav/90"
-            aria-label={`Avançar — ${title}`}
-            title="Próximas 15 cidades"
-            disabled={page === lastPage}
-            onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-          >
-            <ChevronRight />
-          </Button>
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="icon"
+              className="bg-nav text-nav-foreground hover:bg-nav/90"
+              aria-label={`Retroceder — ${title}`}
+              title="15 cidades anteriores"
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              <ChevronLeft />
+            </Button>
+            <Button
+              variant="default"
+              size="icon"
+              className="bg-nav text-nav-foreground hover:bg-nav/90"
+              aria-label={`Avançar — ${title}`}
+              title="Próximas 15 cidades"
+              disabled={page === lastPage}
+              onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+          <span className="text-xs text-muted-foreground" aria-live="polite">
+            {page * porPagina + 1}–{Math.min((page + 1) * porPagina, data.length)} de {data.length}
+          </span>
         </div>
-      </div>
-      <div className="mb-3 flex justify-end">
-        <span className="mr-[74px] text-xs text-muted-foreground" aria-live="polite">
-          {page * porPagina + 1}–{Math.min((page + 1) * porPagina, data.length)} de {data.length}
-        </span>
       </div>
       <div ref={caixaRef} className="w-full">
         <ResponsiveContainer width="100%" height={440}>
@@ -494,7 +480,11 @@ function Chart({
             <XAxis
               type="number"
               fontSize={11}
-              domain={[(min: number) => (min < 0 ? min * 1.45 : min), (max: number) => max]}
+              reversed={somenteQueda}
+              domain={[
+                (min: number) => (min < 0 ? min * 1.45 : min),
+                (max: number) => Math.max(max, 0),
+              ]}
             />
             <YAxis
               type="category"
@@ -692,7 +682,6 @@ function Dashboard() {
           title="Cidades com maior queda numérica de votos"
           data={down}
           color="var(--danger)"
-          margemDireita={8}
         />
       </section>
 
